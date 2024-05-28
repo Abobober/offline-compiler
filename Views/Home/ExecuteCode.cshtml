@@ -1,0 +1,24 @@
+@model Tuple<string, string>
+@{
+    ViewBag.Title = "Execute Code";
+}
+<h2>Execute Code</h2>
+
+<form method="post" action="@Url.Action("ExecuteCode", "Home")">
+    <textarea name="code" rows="10" cols="50"></textarea><br/>
+    <select name="language">
+        <option value="python">Python</option>
+        <option value="cpp">C++</option>
+        <option value="java">Java</option>
+        <option value="csharp">C#</option>
+    </select><br/>
+    <input type="submit" value="Execute"/>
+</form>
+
+@if (Model != null)
+{
+    <h3>Result:</h3>
+    <pre>@Model.Item1</pre>
+    <h3>Errors:</h3>
+    <pre>@Model.Item2</pre>
+}
