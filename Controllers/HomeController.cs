@@ -7,10 +7,17 @@ namespace CompilerProject.Controllers;
 public class HomeController : Controller
 {
     private readonly ILogger<HomeController> _logger;
+    private readonly string _tempPath = Path.Combine(Directory.GetCurrentDirectory(), "tempCodeFiles");
 
     public HomeController(ILogger<HomeController> logger)
     {
         _logger = logger;
+
+        // Ensure the temp path exists
+        if (!Directory.Exists(_tempPath))
+        {
+            Directory.CreateDirectory(_tempPath);
+        }
     }
 
     public IActionResult Index()
@@ -23,21 +30,13 @@ public class HomeController : Controller
         return View();
     }
 
-    public ActionResult ExecuteCode()
+    [HttpGet("Home/ExecuteCode")] // Явный атрибут маршрута для метода GET
+    public IActionResult ExecuteCode()
     {
         return View();
     }
 
-
-    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-    public IActionResult Error()
-    {
-        return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
-    }
-
-
-
-[HttpPost]
+    [HttpPost("Home/ExecuteCode")] // Явный атрибут маршрута для метода POST
     public ActionResult ExecuteCode(string code, string language)
     {
         var result = RunCode(code, language);
@@ -80,13 +79,13 @@ public class HomeController : Controller
 
     private Tuple<string, string> ExecutePython(string code)
     {
-        string fileName = "script.py";
+        string fileName = Path.Combine(_tempPath, "script.py");
         System.IO.File.WriteAllText(fileName, code);
 
         var psi = new ProcessStartInfo
         {
             FileName = "python",
-            Arguments = fileName,
+            Arguments = $"\"{fileName}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -98,14 +97,14 @@ public class HomeController : Controller
 
     private Tuple<string, string> ExecuteCpp(string code)
     {
-        string sourceFile = "program.cpp";
-        string exeFile = "program.exe";
+        string sourceFile = Path.Combine(_tempPath, "program.cpp");
+        string exeFile = Path.Combine(_tempPath, "program.exe");
         System.IO.File.WriteAllText(sourceFile, code);
 
         var compileProcess = new ProcessStartInfo
         {
             FileName = "g++",
-            Arguments = $"{sourceFile} -o {exeFile}",
+            Arguments = $"\"{sourceFile}\" -o \"{exeFile}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -118,7 +117,7 @@ public class HomeController : Controller
         {
             var runProcess = new ProcessStartInfo
             {
-                FileName = exeFile,
+                FileName = $"\"{exeFile}\"", 
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -140,14 +139,14 @@ public class HomeController : Controller
 
     private Tuple<string, string> ExecuteJava(string code)
     {
-        string sourceFile = "Program.java";
-        string classFile = "Program.class";
+        string sourceFile = Path.Combine(_tempPath, "Program.java");
+        string classFile = Path.Combine(_tempPath, "Program.class");
         System.IO.File.WriteAllText(sourceFile, code);
 
         var compileProcess = new ProcessStartInfo
         {
             FileName = "javac",
-            Arguments = sourceFile,
+            Arguments = $"\"{sourceFile}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -161,8 +160,7 @@ public class HomeController : Controller
             var runProcess = new ProcessStartInfo
             {
                 FileName = "java",
-                Arguments = "Program",
-                RedirectStandardOutput = true,
+                Arguments = $"-cp \"{_tempPath}\" Program",
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
@@ -183,14 +181,14 @@ public class HomeController : Controller
 
     private Tuple<string, string> ExecuteCSharp(string code)
     {
-        string sourceFile = "Program.cs";
-        string exeFile = "Program.exe";
+        string sourceFile = Path.Combine(_tempPath, "Program.cs");
+        string exeFile = Path.Combine(_tempPath, "Program.exe");
         System.IO.File.WriteAllText(sourceFile, code);
 
         var compileProcess = new ProcessStartInfo
         {
             FileName = "csc",
-            Arguments = $"/out:{exeFile} {sourceFile}",
+            Arguments = $"/out:\"{exeFile}\" \"{sourceFile}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -203,7 +201,7 @@ public class HomeController : Controller
         {
             var runProcess = new ProcessStartInfo
             {
-                FileName = exeFile,
+                FileName = $"\"{exeFile}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -230,16 +228,21 @@ public class HomeController : Controller
 
         try
         {
-            using (var process = Process.Start(psi))
+            using (var process = new Process())
             {
-                if (process == null)
-                {
-                    throw new InvalidOperationException("Failed to start process.");
-                }
+                process.StartInfo = psi;
+                process.Start();
 
-                output = process.StandardOutput.ReadToEnd();
-                errors = process.StandardError.ReadToEnd();
-                process.WaitForExit();
+                if (!process.WaitForExit(50000)) // 5 секунд таймаут
+                {
+                    process.Kill();
+                    errors = "Process timed out.";
+                }
+                else
+                {
+                    output = process.StandardOutput.ReadToEnd();
+                    errors = process.StandardError.ReadToEnd();
+                }
             }
         }
         catch (Exception ex)
@@ -257,6 +260,7 @@ public class HomeController : Controller
         return Tuple.Create(output, errors);
     }
 }
+
 
 
 
