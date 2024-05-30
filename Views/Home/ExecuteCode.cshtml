@@ -2,23 +2,77 @@
 @{
     ViewBag.Title = "Execute Code";
 }
-<h2>Execute Code</h2>
+<!DOCTYPE html>
+<html lang="en">
 
-<form method="post" action="@Url.Action("ExecuteCode", "Home")">
-    <textarea name="code" rows="10" cols="50"></textarea><br/>
-    <select name="language">
-        <option value="python">Python</option>
-        <option value="cpp">C++</option>
-        <option value="java">Java</option>
-        <option value="csharp">C#</option>
-    </select><br/>
-    <input type="submit" value="Execute"/>
-</form>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewBag.Title</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+</head>
 
-@if (Model != null)
-{
-    <h3>Result:</h3>
-    <pre>@Model.Item1</pre>
-    <h3>Errors:</h3>
-    <pre>@Model.Item2</pre>
-}
+<body>
+    <div class="container mt-5">
+        <h2 class="mb-4">Execute Code</h2>
+        <form id="codeForm" method="post" action="@Url.Action("ExecuteCode", "Home")">
+            <div class="form-group mb-3">
+                <label for="code" class="form-label">Code:</label>
+                <textarea class="form-control bg-dark text-white" id="code" name="code" rows="10"
+                    placeholder="Enter your code here..."></textarea>
+            </div>
+            <div class="form-group mb-3">
+                <label for="language" class="form-label">Language:</label>
+                <select class="form-select form-select-sm w-auto" id="language" name="language">
+                    <option value="python">Python</option>
+                    <option value="cpp">C++</option>
+                    <option value="java">Java</option>
+                    <option value="csharp">C#</option>
+                </select>
+            </div>
+            <!-- Поле для ввода данных пользователя -->
+            <div class="form-group mb-3">
+                <label for="userData" class="form-label">User Input:</label>
+                <input type="text" class="form-control" id="userData" name="userData" placeholder="Enter user input...">
+            </div>
+            <!-- Кнопка отправки формы -->
+            <button type="submit" class="btn btn-primary">Execute</button>
+        </form>
+
+        @if (Model != null)
+        {
+            <div class="mt-4">
+                <h3>Result:</h3>
+                <pre class="bg-dark p-5 text-white">@Model.Item1</pre>
+                <h3>Errors:</h3>
+                <pre class="bg-dark p-5 text-danger">@Model.Item2</pre>
+            </div>
+        }
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Restore form values from localStorage
+        const code = localStorage.getItem('code');
+        const language = localStorage.getItem('language');
+
+        if (code) {
+            document.getElementById('code').value = code;
+        }
+
+        if (language) {
+            document.getElementById('language').value = language;
+        }
+
+        // Save form values to localStorage on submit
+        document.getElementById('codeForm').addEventListener('submit', function() {
+            localStorage.setItem('code', document.getElementById('code').value);
+            localStorage.setItem('language', document.getElementById('language').value);
+        });
+    });
+</script>
+</body>
+
+</html>

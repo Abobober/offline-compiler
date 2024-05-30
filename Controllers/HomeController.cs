@@ -1,8 +1,5 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using CompilerProject.Models;
-
-namespace CompilerProject.Controllers;
 
 public class HomeController : Controller
 {
@@ -13,7 +10,6 @@ public class HomeController : Controller
     {
         _logger = logger;
 
-        // Ensure the temp path exists
         if (!Directory.Exists(_tempPath))
         {
             Directory.CreateDirectory(_tempPath);
@@ -37,13 +33,13 @@ public class HomeController : Controller
     }
 
     [HttpPost("Home/ExecuteCode")] // Явный атрибут маршрута для метода POST
-    public ActionResult ExecuteCode(string code, string language)
+    public ActionResult ExecuteCode(string code, string language, string userData)
     {
-        var result = RunCode(code, language);
+        var result = RunCode(code, language, userData);
         return View(Tuple.Create(result.Item1, result.Item2));
     }
 
-    private Tuple<string, string> RunCode(string code, string language)
+    private Tuple<string, string> RunCode(string code, string language, string userData)
     {
         string output = string.Empty;
         string errors = string.Empty;
@@ -53,16 +49,16 @@ public class HomeController : Controller
             switch (language.ToLower())
             {
                 case "python":
-                    (output, errors) = ExecutePython(code);
+                    (output, errors) = ExecutePython(code, userData);
                     break;
                 case "cpp":
-                    (output, errors) = ExecuteCpp(code);
+                    (output, errors) = ExecuteCpp(code, userData);
                     break;
                 case "java":
-                    (output, errors) = ExecuteJava(code);
+                    (output, errors) = ExecuteJava(code, userData);
                     break;
                 case "csharp":
-                    (output, errors) = ExecuteCSharp(code);
+                    (output, errors) = ExecuteCSharp(code, userData);
                     break;
                 default:
                     errors = "Unsupported language";
@@ -77,7 +73,7 @@ public class HomeController : Controller
         return Tuple.Create(output, errors);
     }
 
-    private Tuple<string, string> ExecutePython(string code)
+    private Tuple<string, string> ExecutePython(string code, string userData)
     {
         string fileName = Path.Combine(_tempPath, "script.py");
         System.IO.File.WriteAllText(fileName, code);
@@ -86,16 +82,17 @@ public class HomeController : Controller
         {
             FileName = "python",
             Arguments = $"\"{fileName}\"",
+            RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
 
-        return ExecuteProcess(psi, fileName);
+        return ExecuteProcess(psi, fileName, userData);
     }
 
-    private Tuple<string, string> ExecuteCpp(string code)
+    private Tuple<string, string> ExecuteCpp(string code, string userData)
     {
         string sourceFile = Path.Combine(_tempPath, "program.cpp");
         string exeFile = Path.Combine(_tempPath, "program.exe");
@@ -105,6 +102,7 @@ public class HomeController : Controller
         {
             FileName = "g++",
             Arguments = $"\"{sourceFile}\" -o \"{exeFile}\"",
+            RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -117,14 +115,15 @@ public class HomeController : Controller
         {
             var runProcess = new ProcessStartInfo
             {
-                FileName = $"\"{exeFile}\"", 
+                FileName = $"\"{exeFile}\"",
+                RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
 
-            var runResult = ExecuteProcess(runProcess);
+            var runResult = ExecuteProcess(runProcess, null, userData);
 
             System.IO.File.Delete(sourceFile);
             System.IO.File.Delete(exeFile);
@@ -137,7 +136,7 @@ public class HomeController : Controller
         return compileResult;
     }
 
-    private Tuple<string, string> ExecuteJava(string code)
+    private Tuple<string, string> ExecuteJava(string code, string userData)
     {
         string sourceFile = Path.Combine(_tempPath, "Program.java");
         string classFile = Path.Combine(_tempPath, "Program.class");
@@ -161,12 +160,14 @@ public class HomeController : Controller
             {
                 FileName = "java",
                 Arguments = $"-cp \"{_tempPath}\" Program",
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
 
-            var runResult = ExecuteProcess(runProcess);
+            var runResult = ExecuteProcess(runProcess, null, userData);
 
             System.IO.File.Delete(sourceFile);
             System.IO.File.Delete(classFile);
@@ -179,7 +180,7 @@ public class HomeController : Controller
         return compileResult;
     }
 
-    private Tuple<string, string> ExecuteCSharp(string code)
+    private Tuple<string, string> ExecuteCSharp(string code, string userData)
     {
         string sourceFile = Path.Combine(_tempPath, "Program.cs");
         string exeFile = Path.Combine(_tempPath, "Program.exe");
@@ -189,6 +190,7 @@ public class HomeController : Controller
         {
             FileName = "csc",
             Arguments = $"/out:\"{exeFile}\" \"{sourceFile}\"",
+            RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -202,13 +204,14 @@ public class HomeController : Controller
             var runProcess = new ProcessStartInfo
             {
                 FileName = $"\"{exeFile}\"",
+                RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
 
-            var runResult = ExecuteProcess(runProcess);
+            var runResult = ExecuteProcess(runProcess, null, userData);
 
             System.IO.File.Delete(sourceFile);
             System.IO.File.Delete(exeFile);
@@ -221,7 +224,7 @@ public class HomeController : Controller
         return compileResult;
     }
 
-    private Tuple<string, string> ExecuteProcess(ProcessStartInfo psi, string? fileToDelete = null)
+    private Tuple<string, string> ExecuteProcess(ProcessStartInfo psi, string? fileToDelete = null, string? userData = null)
     {
         string output = string.Empty;
         string errors = string.Empty;
@@ -233,7 +236,16 @@ public class HomeController : Controller
                 process.StartInfo = psi;
                 process.Start();
 
-                if (!process.WaitForExit(50000)) // 5 секунд таймаут
+                if (!string.IsNullOrEmpty(userData))
+                {
+                    using (StreamWriter writer = process.StandardInput)
+                    {
+                        writer.WriteLine(userData);
+                        writer.Flush();
+                    }
+                }
+
+                if (!process.WaitForExit(5000)) // 5 секунд таймаут
                 {
                     process.Kill();
                     errors = "Process timed out.";
@@ -260,8 +272,4 @@ public class HomeController : Controller
         return Tuple.Create(output, errors);
     }
 }
-
-
-
-
 
